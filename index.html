@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Icee's MP3 Player</title>
+    <style>
+        html, body {
+            height: 100dvh;
+            margin: 0;
+            padding: 0;
+            background-color: black;
+            color: white;
+            font-family: monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body {
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            box-sizing: border-box;
+        }
+
+        #playlist {
+            flex: 1;
+            overflow-y: auto;
+            border: 3px solid white;
+            background-color: #404040;
+            margin: 8px 8px 0 8px;
+            padding: 10px;
+            min-height: 0; /* Crucial for flex */
+            border-radius: 4px;
+        }
+
+        .track-item {
+            background-color: #808080;
+            border: 2px solid white;
+            padding: 14px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            word-break: break-all;
+            border-radius: 4px;
+        }
+
+        .track-item.loaded {
+            background-color: #a0a0a0;
+        }
+
+        .track-item.current {
+            border-color: white;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+        }
+
+        .track-item.dragging {
+            opacity: 0.5;
+        }
+
+        #controls {
+            padding: 10px 8px;
+            flex-shrink: 0;
+            background-color: black;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #mainControls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #prev, #next {
+            flex: 1;
+            background-color: #808080;
+            border: 3px solid white;
+            color: white;
+            padding: 20px;
+            font-size: 18px;
+            text-align: center;
+            box-shadow: 0 5px 0 #404040;
+            transition: all 0.1s;
+            user-select: none;
+            border-radius: 6px;
+        }
+
+        #playPause {
+            flex: 2.2;
+            background-color: #a0a0a0;
+            border: 4px solid white;
+            color: white;
+            padding: 26px;
+            font-size: 21px;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 7px 0 #606060;
+            transition: all 0.1s;
+            user-select: none;
+            border-radius: 8px;
+        }
+
+        #lowerControls {
+            display: flex;
+            gap: 10px;
+        }
+
+        #loop, #selectFiles {
+            flex: 1;
+            background-color: #808080;
+            border: 3px solid white;
+            color: white;
+            padding: 18px;
+            font-size: 16px;
+            text-align: center;
+            box-shadow: 0 5px 0 #404040;
+            transition: all 0.1s;
+            user-select: none;
+            border-radius: 6px;
+        }
+
+        .button:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #404040;
+        }
+
+        #playlist::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        #playlist::-webkit-scrollbar-thumb {
+            background: white;
+            border: 2px solid black;
+            border-radius: 6px;
+        }
+
+        audio { display: none; }
+    </style>
+</head>
+<body>
+    <div id="playlist"></div>
+
+    <div id="controls">
+        <div id="mainControls">
+            <div class="button" id="prev">⏮ Prev</div>
+            <div class="button" id="playPause">▶ Play</div>
+            <div class="button" id="next">⏭ Next</div>
+        </div>
+
+        <div id="lowerControls">
+            <div class="button" id="loop">⏹ Loop: Off</div>
+            <div class="button" id="selectFiles">Select MP3s</div>
+        </div>
+    </div>
+
+    <audio id="audio"></audio>
+
+    <script>
+        const audio = document.getElementById('audio');
+        const playPauseBtn = document.getElementById('playPause');
+        const prevBtn = document.getElementById('prev');
+        const nextBtn = document.getElementById('next');
+        const loopBtn = document.getElementById('loop');
+        const selectFilesBtn = document.getElementById('selectFiles');
+        const playlistContainer = document.getElementById('playlist');
+
+        let playlist = [];
+        let currentIndex = 0;
+        let isPlaying = false;
+        let loopMode = 'off';
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'audio/mp3';
+        fileInput.multiple = true;
+
+        function updatePlaylistUI() {
+            playlistContainer.innerHTML = '';
+            playlist.forEach((track, index) => {
+                const item = document.createElement('div');
+                item.classList.add('track-item');
+                if (track.url) item.classList.add('loaded');
+                if (index === currentIndex) item.classList.add('current');
+                item.textContent = track.name;
+                item.draggable = true;
+                item.dataset.index = index;
+
+                item.addEventListener('dragstart', e => {
+                    e.target.classList.add('dragging');
+                    dragIndex = index;
+                });
+                item.addEventListener('dragover', e => e.preventDefault());
+                item.addEventListener('drop', e => {
+                    e.preventDefault();
+                    const dropIndex = index;
+                    if (dragIndex === dropIndex) return;
+
+                    const [moved] = playlist.splice(dragIndex, 1);
+                    playlist.splice(dropIndex, 0, moved);
+
+                    if (dragIndex === currentIndex) currentIndex = dropIndex;
+                    else if (dragIndex < currentIndex && dropIndex >= currentIndex) currentIndex--;
+                    else if (dragIndex > currentIndex && dropIndex <= currentIndex) currentIndex++;
+
+                    updatePlaylistUI();
+                });
+                item.addEventListener('dragend', e => e.target.classList.remove('dragging'));
+                item.addEventListener('click', () => playTrack(index));
+
+                playlistContainer.appendChild(item);
+            });
+        }
+
+        function playTrack(index) {
+            if (index < 0 || index >= playlist.length || !playlist[index].url) return;
+            currentIndex = index;
+            audio.src = playlist[index].url;
+            audio.play().then(() => {
+                isPlaying = true;
+                playPauseBtn.textContent = '⏸ Pause';
+                updatePlaylistUI();
+            });
+        }
+
+        function togglePlay() {
+            if (isPlaying) {
+                audio.pause();
+                isPlaying = false;
+                playPauseBtn.textContent = '▶ Play';
+            } else if (audio.src) {
+                audio.play();
+                isPlaying = true;
+                playPauseBtn.textContent = '⏸ Pause';
+            }
+        }
+
+        function nextTrack() {
+            let nextIndex = (currentIndex + 1) % playlist.length;
+            playTrack(nextIndex);
+        }
+
+        function prevTrack() {
+            let prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+            playTrack(prevIndex);
+        }
+
+        function cycleLoop() {
+            if (loopMode === 'off') {
+                loopMode = 'one';
+                loopBtn.textContent = '🔂 Loop: One';
+            } else if (loopMode === 'one') {
+                loopMode = 'all';
+                loopBtn.textContent = '🔁 Loop: All';
+            } else {
+                loopMode = 'off';
+                loopBtn.textContent = '⏹ Loop: Off';
+            }
+        }
+
+        audio.addEventListener('ended', () => {
+            if (loopMode === 'one') audio.play();
+            else if (loopMode === 'all') nextTrack();
+            else {
+                isPlaying = false;
+                playPauseBtn.textContent = '▶ Play';
+            }
+        });
+
+        selectFilesBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            fileInput.onchange = (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+
+                playlist.forEach(t => t.url && URL.revokeObjectURL(t.url));
+                playlist = files.map(f => ({ name: f.name, url: URL.createObjectURL(f) }));
+                currentIndex = 0;
+                updatePlaylistUI();
+                playTrack(0);
+            };
+            fileInput.click();
+        });
+
+        playPauseBtn.addEventListener('click', togglePlay);
+        prevBtn.addEventListener('click', prevTrack);
+        nextBtn.addEventListener('click', nextTrack);
+        loopBtn.addEventListener('click', cycleLoop);
+
+        let dragIndex = null;
+
+        updatePlaylistUI();
+    </script>
+</body>
+</html>
