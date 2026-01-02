@@ -18,12 +18,10 @@
             display: flex;
             flex-direction: column;
         }
-
         body {
             padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
             box-sizing: border-box;
         }
-
         #playlist {
             flex: 1;
             overflow-y: auto;
@@ -31,10 +29,10 @@
             background-color: #404040;
             margin: 8px 8px 0 8px;
             padding: 10px;
-            min-height: 0; /* Crucial for flex */
+            min-height: 0;
             border-radius: 4px;
+            position: relative;
         }
-
         .track-item {
             background-color: #808080;
             border: 2px solid white;
@@ -45,20 +43,95 @@
             word-break: break-all;
             border-radius: 4px;
         }
-
         .track-item.loaded {
             background-color: #a0a0a0;
         }
-
         .track-item.current {
             border-color: white;
-            box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+            background-color: #c0c0c0 !important;
         }
-
         .track-item.dragging {
             opacity: 0.5;
         }
-
+        /* Loading status with progress bar */
+        .loading-status {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #303030 0%, #404040 100%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 20px;
+            padding: 20px;
+            border-radius: 4px;
+        }
+        .loading-status h2 {
+            font-size: 28px;
+            color: #aaffaa;
+            margin: 0 0 20px 0;
+            text-shadow: 2px 2px 0 #000;
+        }
+        .loading-status p {
+            color: #ccc;
+            margin: 20px 0 30px 0;
+            font-size: 16px;
+        }
+        /* Progress bar */
+        .progress-container {
+            width: 80%;
+            max-width: 400px;
+            height: 20px;
+            background-color: #303030;
+            border: 3px solid white;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #66ff66;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(102, 255, 102, 0.6);
+        }
+        .progress-text {
+            margin-top: 10px;
+            font-size: 18px;
+            color: #aaffaa;
+        }
+        /* NO SONG status */
+        .no-song-status {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #303030 0%, #404040 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 20px;
+            padding: 20px;
+            border-radius: 4px;
+        }
+        .no-song-status h2 {
+            font-size: 28px;
+            color: #ffaaaa;
+            margin: 0 0 10px 0;
+            text-shadow: 2px 2px 0 #000;
+        }
+        .no-song-status p {
+            color: #ccc;
+            margin: 0 0 30px 0;
+            font-size: 16px;
+        }
+        .status-icon {
+            font-size: 64px;
+            opacity: 0.7;
+            margin-bottom: 20px;
+        }
         #controls {
             padding: 10px 8px;
             flex-shrink: 0;
@@ -67,13 +140,11 @@
             flex-direction: column;
             gap: 10px;
         }
-
         #mainControls {
             display: flex;
             gap: 10px;
             align-items: center;
         }
-
         #prev, #next {
             flex: 1;
             background-color: #808080;
@@ -87,7 +158,13 @@
             user-select: none;
             border-radius: 6px;
         }
-
+        body:not(.playing) #prev,
+        body:not(.playing) #next {
+            background-color: #505050;
+            border-color: #888;
+            color: #aaa;
+            box-shadow: 0 5px 0 #303030;
+        }
         #playPause {
             flex: 2.2;
             background-color: #a0a0a0;
@@ -102,12 +179,20 @@
             user-select: none;
             border-radius: 8px;
         }
-
+        body:not(.playing) #playPause {
+            background-color: #ff6666;
+            border-color: #ffaaaa;
+            box-shadow: 0 7px 0 #cc4444;
+        }
+        body.playing #playPause {
+            background-color: #66cc66;
+            border-color: #aaffaa;
+            box-shadow: 0 7px 0 #44aa44;
+        }
         #lowerControls {
             display: flex;
             gap: 10px;
         }
-
         #loop, #selectFiles {
             flex: 1;
             background-color: #808080;
@@ -121,35 +206,45 @@
             user-select: none;
             border-radius: 6px;
         }
-
         .button:active {
             transform: translateY(4px);
-            box-shadow: 0 1px 0 #404040;
+            box-shadow: 0 1px 0 #202020 !important;
+            background-color: #606060 !important;
         }
-
         #playlist::-webkit-scrollbar {
             width: 12px;
         }
-
         #playlist::-webkit-scrollbar-thumb {
             background: white;
             border: 2px solid black;
             border-radius: 6px;
         }
-
         audio { display: none; }
     </style>
 </head>
 <body>
-    <div id="playlist"></div>
+    <div id="playlist">
+        <div id="noSongStatus" class="no-song-status">
+            <div class="status-icon">🎵</div>
+            <h2>NO SONG</h2>
+            <p>Tap "Select MP3s" to load your music<br>Then tap any track or use Play</p>
+        </div>
+        <div id="loadingStatus" class="loading-status">
+            <h2>LOADING MUSIC</h2>
+            <p>Preparing your files...</p>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">0%</div>
+        </div>
+    </div>
 
     <div id="controls">
         <div id="mainControls">
             <div class="button" id="prev">⏮ Prev</div>
-            <div class="button" id="playPause">▶ Play</div>
+            <div class="button" id="playPause">🚫 No Song</div>
             <div class="button" id="next">⏭ Next</div>
         </div>
-
         <div id="lowerControls">
             <div class="button" id="loop">⏹ Loop: Off</div>
             <div class="button" id="selectFiles">Select MP3s</div>
@@ -166,19 +261,61 @@
         const loopBtn = document.getElementById('loop');
         const selectFilesBtn = document.getElementById('selectFiles');
         const playlistContainer = document.getElementById('playlist');
+        const noSongStatus = document.getElementById('noSongStatus');
+        const loadingStatus = document.getElementById('loadingStatus');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const body = document.body;
 
         let playlist = [];
         let currentIndex = 0;
         let isPlaying = false;
         let loopMode = 'off';
+        let hasSongs = false;
 
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
-        fileInput.accept = 'audio/mp3';
+        fileInput.accept = 'audio/mp3,audio/mpeg';
         fileInput.multiple = true;
 
+        function showLoading() {
+            loadingStatus.style.display = 'flex';
+            noSongStatus.style.display = 'none';
+            progressBar.style.width = '0%';
+            progressText.textContent = '0%';
+            playlistContainer.querySelectorAll('.track-item').forEach(el => el.remove());
+        }
+
+        function updateProgress(percentage) {
+            progressBar.style.width = percentage + '%';
+            progressText.textContent = Math.round(percentage) + '%';
+        }
+
+        function hideLoading() {
+            loadingStatus.style.display = 'none';
+        }
+
+        function updateStatus() {
+            if (playlist.length === 0 || !hasSongs) {
+                noSongStatus.style.display = 'flex';
+                body.classList.remove('playing');
+                playPauseBtn.textContent = '🚫 No Song';
+            } else {
+                noSongStatus.style.display = 'none';
+                if (isPlaying) {
+                    body.classList.add('playing');
+                    playPauseBtn.textContent = '⏸ Pause';
+                } else {
+                    body.classList.remove('playing');
+                    playPauseBtn.textContent = '▶ Play';
+                }
+            }
+        }
+
         function updatePlaylistUI() {
-            playlistContainer.innerHTML = '';
+            const items = playlistContainer.querySelectorAll('.track-item');
+            items.forEach(item => item.remove());
+
             playlist.forEach((track, index) => {
                 const item = document.createElement('div');
                 item.classList.add('track-item');
@@ -188,61 +325,66 @@
                 item.draggable = true;
                 item.dataset.index = index;
 
+                item.addEventListener('click', () => playTrack(index));
                 item.addEventListener('dragstart', e => {
                     e.target.classList.add('dragging');
-                    dragIndex = index;
+                    dragIndex = parseInt(e.target.dataset.index);
                 });
                 item.addEventListener('dragover', e => e.preventDefault());
-                item.addEventListener('drop', e => {
-                    e.preventDefault();
-                    const dropIndex = index;
-                    if (dragIndex === dropIndex) return;
-
-                    const [moved] = playlist.splice(dragIndex, 1);
-                    playlist.splice(dropIndex, 0, moved);
-
-                    if (dragIndex === currentIndex) currentIndex = dropIndex;
-                    else if (dragIndex < currentIndex && dropIndex >= currentIndex) currentIndex--;
-                    else if (dragIndex > currentIndex && dropIndex <= currentIndex) currentIndex++;
-
-                    updatePlaylistUI();
-                });
+                item.addEventListener('drop', e => handleDrop(e, index));
                 item.addEventListener('dragend', e => e.target.classList.remove('dragging'));
-                item.addEventListener('click', () => playTrack(index));
 
                 playlistContainer.appendChild(item);
             });
+
+            hasSongs = playlist.some(track => track.url);
+            updateStatus();
         }
 
         function playTrack(index) {
-            if (index < 0 || index >= playlist.length || !playlist[index].url) return;
+            if (index < 0 || index >= playlist.length || !playlist[index].url) {
+                hideLoading();
+                updateStatus();
+                return;
+            }
             currentIndex = index;
             audio.src = playlist[index].url;
+
             audio.play().then(() => {
                 isPlaying = true;
-                playPauseBtn.textContent = '⏸ Pause';
+                hideLoading();
+                updateStatus();
                 updatePlaylistUI();
+            }).catch(err => {
+                console.error('Play failed:', err);
+                isPlaying = false;
+                hideLoading();
+                updateStatus();
             });
         }
 
         function togglePlay() {
+            if (!hasSongs) return;
             if (isPlaying) {
                 audio.pause();
                 isPlaying = false;
-                playPauseBtn.textContent = '▶ Play';
             } else if (audio.src) {
-                audio.play();
-                isPlaying = true;
-                playPauseBtn.textContent = '⏸ Pause';
+                audio.play().then(() => {
+                    isPlaying = true;
+                    hideLoading();
+                });
             }
+            updateStatus();
         }
 
         function nextTrack() {
+            if (!hasSongs) return;
             let nextIndex = (currentIndex + 1) % playlist.length;
             playTrack(nextIndex);
         }
 
         function prevTrack() {
+            if (!hasSongs) return;
             let prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
             playTrack(prevIndex);
         }
@@ -260,26 +402,56 @@
             }
         }
 
+        function handleDrop(e, dropIndex) {
+            if (dragIndex === null || dragIndex === dropIndex) return;
+            const [moved] = playlist.splice(dragIndex, 1);
+            playlist.splice(dropIndex, 0, moved);
+            if (dragIndex <= currentIndex) currentIndex += (dropIndex > dragIndex ? -1 : 1);
+            updatePlaylistUI();
+        }
+
         audio.addEventListener('ended', () => {
             if (loopMode === 'one') audio.play();
-            else if (loopMode === 'all') nextTrack();
+            else if (loopMode === 'all' && hasSongs) nextTrack();
             else {
                 isPlaying = false;
-                playPauseBtn.textContent = '▶ Play';
+                updateStatus();
             }
         });
 
+        audio.addEventListener('pause', updateStatus);
+        audio.addEventListener('play', () => { isPlaying = true; updateStatus(); });
+
         selectFilesBtn.addEventListener('click', () => {
             fileInput.value = '';
-            fileInput.onchange = (e) => {
+            fileInput.onchange = async (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
 
+                showLoading();
+
+                // Clean old URLs
                 playlist.forEach(t => t.url && URL.revokeObjectURL(t.url));
-                playlist = files.map(f => ({ name: f.name, url: URL.createObjectURL(f) }));
+
+                playlist = [];
+                let loaded = 0;
+                const total = files.length;
+
+                for (const file of files) {
+                    const url = URL.createObjectURL(file);
+                    playlist.push({ name: file.name, url });
+
+                    loaded++;
+                    const percentage = (loaded / total) * 100;
+                    updateProgress(percentage);
+
+                    // Small delay to make progress feel smooth
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                }
+
                 currentIndex = 0;
                 updatePlaylistUI();
-                playTrack(0);
+                playTrack(0); // Final playback will hide loading when audio starts
             };
             fileInput.click();
         });
@@ -291,7 +463,7 @@
 
         let dragIndex = null;
 
-        updatePlaylistUI();
+        updateStatus();
     </script>
 </body>
 </html>
